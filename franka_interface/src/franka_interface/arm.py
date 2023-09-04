@@ -707,48 +707,9 @@ class ArmInterface(object):
         :param test: optional function returning True if motion must be aborted
         """
 
-        if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
-            self.switchToController(self._ctrl_manager.joint_trajectory_controller)
-
-        min_traj_dur = 0.5
-        traj_client = JointTrajectoryActionClient(joint_names = self.joint_names())
-        traj_client.clear()
-
-        dur = []
-        for j in range(len(self._joint_names)):
-            dur.append(max(abs(positions[self._joint_names[j]] - self._joint_angle[self._joint_names[j]]) / self._joint_limits.velocity[j], min_traj_dur))
-        duration = max(dur)/self._speed_ratio
-        print('[move_to_joint_positions]: duration:', duration)
-        traj_client.add_point(positions = [positions[n] for n in self._joint_names], time=duration)
-
-        diffs = [self.genf(j, a) for j, a in positions.items() if j in self._joint_angle]
-
-        traj_client.start() # send the trajectory action request
-        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(
-                                                      self.name.capitalize())
-
-        def test_collision():
-            if self.has_collided():
-                rospy.logerr(' '.join(["Collision detected.", fail_msg]))
-                return True
-            return False
-
-        franka_dataflow.wait_for(
-            test=lambda: test_collision() or \
-                         (callable(test) and test() == True) or \
-                         (all(diff() < threshold for diff in diffs)),
-            timeout=max(duration, timeout),
-            timeout_msg=fail_msg,
-            rate=100,
-            raise_on_error=False
-            )
-
-        res = traj_client.result()
-        if res is not None and res.error_code:
-            rospy.loginfo("Trajectory Server Message: {}".format(res))
-
-        rospy.sleep(0.5)
-        rospy.loginfo("ArmInterface: Trajectory controlling complete")
+        q_current = self.joint_angles()
+        position_path = [q_current, positions]
+        self.execute_position_path(position_path, timeout=timeout, threshold=threshold, test=test)
 
     def execute_position_path(self, position_path, timeout=5.0,
                                 threshold=0.00085, test=None):
@@ -767,27 +728,29 @@ class ArmInterface(object):
         @param test: optional function returning True if motion must be aborted
         """
 
+        # Verify that we are at the start of the trajectory
         current_q = self.joint_angles()
         diff_from_start = sum([abs(a-current_q[j]) for j, a in position_path[0].items()])
-        print('[ExecutePositionPath] Diff:', diff_from_start)
-        #print('[ExecutePositionPath] Current:', current_q)
-        #print('[ExecutePositionPath] Start:', position_path[0])
         if diff_from_start > 0.1:
             raise IOError("[ExecutePositionPath] Robot not at start of trajectory")
 
+        # Switch to the joint position trajectory controller
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
             self.switchToController(self._ctrl_manager.joint_trajectory_controller)
 
-        min_traj_dur = 1.0
+        # Create Joint Trajectory action client
         traj_client = JointTrajectoryActionClient(joint_names = self.joint_names())
         traj_client.clear()
+   
+        print('[ExecutePositionPath] Trajectory length:', len(position_path))
+        print('[ExecutePositionPath] Speed ratio:', self._speed_ratio)
 
+        # Compute the timing using joint velocity limits, speed_ratio and min_traj_dur
+        # Start at the second waypoint because robot is already at first waypoint
+        min_traj_dur = 0.5
         time_so_far = 0
         total_times = [0]
         interval_lengths = [0]
-        # Start at the second waypoint because robot is already at first waypoint
-        print('[ExecutePositionPath] Trajectory length:', len(position_path))
-        print('[ExecutePositionPath] Speed ratio:', self._speed_ratio)
         for i in range(1, len(position_path)):
             q = position_path[i]
             dur = []
@@ -798,7 +761,8 @@ class ArmInterface(object):
 
             time_so_far += interval
             total_times.append(time_so_far)
-        #print('[ExecutePositionPath] Interval Lengths:', interval_lengths)
+
+        # Populate Joint Trajectory action client with position path (with computed timings)
         for i in range(1, len(position_path)):
             q_t = position_path[i]
             positions = [q_t[n] for n in self._joint_names]
@@ -816,17 +780,17 @@ class ArmInterface(object):
                                   time=total_times[i],
                                   velocities=velocities)
 
+        # Generate structures needed for franka_dataflow termination check
         diffs = [self.genf(j, a) for j, a in (position_path[-1]).items() if j in self._joint_angle] # Measures diff to last waypoint
-
-        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(
-                                                      self.name.capitalize())
+        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(self.name.capitalize())
         def test_collision():
             if self.has_collided():
                 rospy.logerr(' '.join(["Collision detected.", fail_msg]))
                 return True
             return False
 
-        traj_client.start() # send the trajectory action request
+        # Send the trajectory action request
+        traj_client.start() 
         print('execute_position_path duration:', time_so_far)
         franka_dataflow.wait_for(
             test=lambda: test_collision() or \
@@ -837,11 +801,92 @@ class ArmInterface(object):
             rate=100,
             raise_on_error=False
             )
-        #print('Arm Diff:', [diff() for diff in diffs])
-        rospy.sleep(0.5)
+        rospy.sleep(0.1)
         rospy.loginfo("ArmInterface: Trajectory controlling complete")
 
-    def execute_position_velocity_path(self, position_path, timeout=5.0,
+    def execute_position_trajectory(self, position_path, path_timing, timeout=5.0,
+                                threshold=0.00085, test=None):
+        """
+        (Blocking) Commands the limb to the provided positions.
+        Waits until the reported joint state matches that specified.
+        This function uses a low-pass filter to smooth the movement.
+
+        @type position_path: dict({str:float})
+        @param position_path: joint_name:angle command
+        @type timeout: float
+        @param timeout: seconds to wait for move to finish [15]
+        @type threshold: float
+        @param threshold: position threshold in radians across each joint when
+        move is considered successful [0.008726646]
+        @param test: optional function returning True if motion must be aborted
+        """
+
+        if len(position_path) != len(path_timing):
+            raise IOError("[ExecutePositionPath] Position and timing lengths mismatch")
+
+        # Verify that we are at the start of the trajectory
+        current_q = self.joint_angles()
+        diff_from_start = sum([abs(a-current_q[j]) for j, a in position_path[0].items()])
+        if diff_from_start > 0.1:
+            raise IOError("[ExecutePositionPath] Robot not at start of trajectory")
+
+        # Switch to the joint position trajectory controller
+        if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
+            self.switchToController(self._ctrl_manager.joint_trajectory_controller)
+
+        # Create Joint Trajectory action client
+        traj_client = JointTrajectoryActionClient(joint_names = self.joint_names())
+        traj_client.clear()
+
+        # Populate Joint Trajectory action client with position path (with specified timings)
+        total_times = np.cumsum(path_timing)
+        for i in range(1, len(position_path)):
+            q_t = position_path[i]
+            positions = [q_t[n] for n in self._joint_names]
+
+            if i < len(position_path)-1:
+                q_tm1 = position_path[i-1]
+                q_tp1 = position_path[i+1]
+                dt = path_timing[i] + path_timing[i+1]  
+                velocities = [(q_tp1[n]-q_tm1[n])/dt for n in self._joint_names]
+                # Check that, using specified timing, the desired velocity is within velocity limits. 
+                if not all(np.less(velocities, self._joint_limits.velocity)):
+                    raise ValueError("Specified timing violated velocity limits")
+                print(i, velocities)
+            else:
+                # For the last waypoint, use some default velocity
+                velocities = [0.005 for n in self._joint_names]
+                print(i, velocities)
+
+            traj_client.add_point(positions=positions,
+                                  time=total_times[i],
+                                  velocities=velocities)
+      
+        # Generate structures needed for franka_dataflow termination check
+        diffs = [self.genf(j, a) for j, a in (position_path[-1]).items() if j in self._joint_angle] # Measures diff to last waypoint
+        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(self.name.capitalize())
+        def test_collision():
+            if self.has_collided():
+                rospy.logerr(' '.join(["Collision detected.", fail_msg]))
+                return True
+            return False
+
+        # Send the trajectory action request
+        traj_client.start() 
+        print('execute_position_path duration:', total_times[-1])
+        franka_dataflow.wait_for(
+            test=lambda: test_collision() or \
+                         (callable(test) and test() == True) or \
+                         (all(diff() < threshold for diff in diffs)),
+            timeout=max(total_times[-1], timeout),
+            timeout_msg=fail_msg,
+            rate=100,
+            raise_on_error=False
+            )
+        rospy.sleep(0.1)
+        rospy.loginfo("ArmInterface: Trajectory controlling complete")
+
+    def execute_position_velocity_path(self, position_path, velocities, timeout=5.0,
                                 threshold=0.00085, test=None):
         """
         (Blocking) Commands the limb to the provided positions.
@@ -858,24 +903,24 @@ class ArmInterface(object):
         @param test: optional function returning True if motion must be aborted
         """
 
-        #TODO need to implement with discussed interface
-
+        # Verify that we are at the start of the trajectory
         current_q = self.joint_angles()
         diff_from_start = sum([abs(a-current_q[j]) for j, a in position_path[0].items()])
         if diff_from_start > 0.1:
             raise IOError("[ExecutePositionPath] Robot not at start of trajectory")
 
+        # Switch to the joint position trajectory controller
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
             self.switchToController(self._ctrl_manager.joint_trajectory_controller)
 
-        min_traj_dur = 1.0
+        min_traj_dur = 0.5
         traj_client = JointTrajectoryActionClient(joint_names = self.joint_names())
         traj_client.clear()
 
         time_so_far = 0
         total_times = [0]
         interval_lengths = [0]
-        # First, using joint limists, compute the time intervals
+        # First, using joint limits, compute the time intervals
         for i in range(1, len(position_path)): # Start at the second waypoint because robot is already at first waypoint
             q = position_path[i]
             dur = []
@@ -886,6 +931,9 @@ class ArmInterface(object):
 
             time_so_far += interval
             total_times.append(time_so_far)
+
+        #TODO check that velocities obey velocity limits
+        #TODO redo below such that dt/interval_lengths are computed from velocities (to populate total_times)
 
         # Loop through position path 
         for i in range(1, len(position_path)):
@@ -905,17 +953,17 @@ class ArmInterface(object):
                                   time=total_times[i],
                                   velocities=velocities)
 
-        diffs = [self.genf(j, a) for j, a in (position_path[-1]).items() if j in self._joint_angle] # Measures diff to last waypoint
-
-        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(
-                                                      self.name.capitalize())
+        # Generate structures needed for franka_dataflow termination check
+        diffs = [self.genf(j, a) for j, a in (position_path[-1]).items() if j in self._joint_angle] 
+        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(self.name.capitalize())
         def test_collision():
             if self.has_collided():
                 rospy.logerr(' '.join(["Collision detected.", fail_msg]))
                 return True
             return False
 
-        traj_client.start() # send the trajectory action request
+        # Send the trajectory action request
+        traj_client.start() 
         print('execute_position_path duration:', time_so_far)
         franka_dataflow.wait_for(
             test=lambda: test_collision() or \
