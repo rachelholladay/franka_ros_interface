@@ -588,74 +588,12 @@ class ArmInterface(object):
             rospy.logwarn("ArmInterface: Setting speed above 0.3 could be risky!! Be extremely careful.")
         self._speed_ratio = speed
 
-    '''
-    def set_joint_positions(self, positions):
-        """
-        Commands the joints of this limb to the specified positions.
-
-        :type positions: dict({str:float}
-        :param positions: dict of {'joint_name':joint_position,}
-        """
-        self._command_msg.names = self._joint_names
-        self._command_msg.position = [positions[j] for j in self._joint_names]
-        self._command_msg.mode = JointCommand.POSITION_MODE
-        self._command_msg.header.stamp = rospy.Time.now()
-        self._joint_command_publisher.publish(self._command_msg)
-
-    def set_joint_velocities(self, velocities):
-        """
-        Commands the joints of this limb to the specified velocities.
-
-        :type velocities: dict({str:float})
-        :param velocities: dict of {'joint_name':joint_velocity,}
-        """
-        self._command_msg.names = self._joint_names
-        self._command_msg.velocity = [velocities[j] for j in self._joint_names]
-        self._command_msg.mode = JointCommand.VELOCITY_MODE
-        self._command_msg.header.stamp = rospy.Time.now()
-        self._joint_command_publisher.publish(self._command_msg)
-
-    def set_joint_torques(self, torques):
-        """
-        Commands the joints of this limb with the specified torques.
-
-        :type torques: dict({str:float})
-        :param torques: dict of {'joint_name':joint_torque,}
-        """
-        self._command_msg.names = self._joint_names
-        self._command_msg.effort = [torques[j] for j in self._joint_names]
-        self._command_msg.mode = JointCommand.TORQUE_MODE
-        self._command_msg.header.stamp = rospy.Time.now()
-        self._joint_command_publisher.publish(self._command_msg)
-
-    def set_joint_positions_velocities(self, positions, velocities):
-        """
-        Commands the joints of this limb using specified positions and velocities using impedance control.
-        Command at time t is computed as:
-
-        :math:`u_t= coriolis\_factor * coriolis\_t + K\_p * (positions - curr\_positions) +  K\_d * (velocities - curr\_velocities)`
-
-
-        :type positions: [float]
-        :param positions: desired joint positions as an ordered list corresponding to joints given by self.joint_names()
-        :type velocities: [float]
-        :param velocities: desired joint velocities as an ordered list corresponding to joints given by self.joint_names()
-        """
-        self._command_msg.names = self._joint_names
-        self._command_msg.position = positions
-        self._command_msg.velocity = velocities
-        self._command_msg.mode = JointCommand.IMPEDANCE_MODE
-        self._command_msg.header.stamp = rospy.Time.now()
-        self._joint_command_publisher.publish(self._command_msg)
-    '''
-
     def has_collided(self):
         """
         Returns true if either joint collision or cartesian collision is detected.
         Collision thresholds can be set using instance of :py:class:`franka_tools.CollisionBehaviourInterface`.
         """
         return any(self._joint_collision) or any(self._cartesian_collision)
-
 
     def switchToController(self, controller_name):
         active_controllers = self._ctrl_manager.list_active_controllers(only_motion_controllers = True)
@@ -1080,14 +1018,11 @@ class ArmInterface(object):
         print('[move_from_touch] duration:', duration)
         traj_client.add_point(positions = [positions[n] for n in self._joint_names], time=duration)
 
-
-
         diffs = [self.genf(j, a) for j, a in positions.items() if j in self._joint_angle]
-        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(
-                                                      self.name.capitalize())
+        fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(self.name.capitalize())
 
-        traj_client.start() # send the trajectory action request
-
+        # Send the trajectory action request
+        traj_client.start() 
         franka_dataflow.wait_for(
             test=lambda: (all(diff() < threshold for diff in diffs)),
             timeout=max(duration, timeout),
@@ -1095,17 +1030,16 @@ class ArmInterface(object):
             rate=100,
             raise_on_error=False
             )
-        #print('[move_from_touch] Actual end config')
-        #print(self.joint_angles())
-        #print('[move_from_touch] Arm Diff:', [diff() for diff in diffs])
         rospy.sleep(0.5)
         rospy.loginfo("ArmInterface: Trajectory controlling complete")
 
-    def set_joint_velocity(self, v):
+    def set_joint_velocity(self, velocity, timeout):
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_velocity_controller: 
             self.switchToController(self._ctrl_manager.joint_velocity_controller)
 
-        return NotImplementedError("Need to develop the interface for this")
+        #TODO One interface idea is to take a velocity and a timeout and to set that velocity until the timeout 
+        # (where we then command zero velocity to stop the motion)
+        return NotImplementedError("[SetJointVelocity] Controller not Implemented")
 
     def set_joint_impedance_config(self, q, stiffness=None, vel=0.005):
         #Need q converted to list
@@ -1136,7 +1070,7 @@ class ArmInterface(object):
             if i == 0: self.resetErrors()
 
     def set_joint_torques(self, tau):
-        raise NotImplementedError("Still working on the bugs in this!")
+        raise NotImplementedError("[SetJointTorques] Controller seems to still be buggy.")
 
         switch_ctrl = True if self._ctrl_manager.current_controller != self._ctrl_manager.joint_torque_controller else False
         if switch_ctrl:
@@ -1169,7 +1103,7 @@ class ArmInterface(object):
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_velocity_controller: 
             self.switchToController(self._ctrl_manager.cartesian_velocity_controller)
 
-        return NotImplementedError("Need to develop the interface for this")
+        return NotImplementedError("[SetCartesianVelocity] Controller not Implemented")
 
     def set_cartesian_impedance_pose(self, pose, stiffness=None):
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_impedance_controller: 
