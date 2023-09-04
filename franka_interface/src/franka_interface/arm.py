@@ -1078,6 +1078,8 @@ class ArmInterface(object):
         self._joint_torque_controller_publisher.publish(torque)
 
     def set_cartesian_pose(self, pose):
+        raise NotImplementedError("[SetCartesianPose] Controller seems to still be buggy.")
+
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_pose_controller:
             self.switchToController(self._ctrl_manager.cartesian_pose_controller)
 
