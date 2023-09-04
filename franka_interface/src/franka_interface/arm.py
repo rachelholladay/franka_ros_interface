@@ -760,13 +760,13 @@ class ArmInterface(object):
         """
 
         if len(position_path) != len(path_timing):
-            raise IOError("[ExecutePositionPath] Position and timing lengths mismatch")
+            raise IOError("[ExecutePositionTrajectory] Position and timing lengths mismatch")
 
         # Verify that we are at the start of the trajectory
         current_q = self.joint_angles()
         diff_from_start = sum([abs(a-current_q[j]) for j, a in position_path[0].items()])
         if diff_from_start > 0.1:
-            raise IOError("[ExecutePositionPath] Robot not at start of trajectory")
+            raise IOError("[ExecutePositionTrajectory] Robot not at start of trajectory")
 
         # Switch to the joint position trajectory controller
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
@@ -824,7 +824,7 @@ class ArmInterface(object):
         rospy.sleep(0.1)
         rospy.loginfo("ArmInterface: Trajectory controlling complete")
 
-    def execute_position_velocity_path(self, position_path, velocities, timeout=5.0,
+    def execute_position_velocity_trajectory(self, position_path, velocities_sequence, timeout=5.0,
                                 threshold=0.00085, test=None):
         """
         (Blocking) Commands the limb to the provided positions.
@@ -840,6 +840,14 @@ class ArmInterface(object):
         move is considered successful [0.008726646]
         @param test: optional function returning True if motion must be aborted
         """
+        
+        # Check that matching lengths and that specified velocities are within velocity limits
+        if len(position_path) != len(velocities_sequence):
+            raise IOError("[ExecutePositionVelocityTrajectory] Position and velocity lengths mismatch")
+        for v in velocities_sequence:
+            if not all(np.less(v, self._joint_limits.velocity)):
+                    raise ValueError("[ExecutePositionVelocityTrajectory] Specified velocities violate velocity limits")
+
 
         # Verify that we are at the start of the trajectory
         current_q = self.joint_angles()
@@ -851,44 +859,33 @@ class ArmInterface(object):
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
             self.switchToController(self._ctrl_manager.joint_trajectory_controller)
 
-        min_traj_dur = 0.5
+        # Create Joint Trajectory action client
         traj_client = JointTrajectoryActionClient(joint_names = self.joint_names())
         traj_client.clear()
 
+        # Loop through position and velocities, computing the time
         time_so_far = 0
-        total_times = [0]
-        interval_lengths = [0]
-        # First, using joint limits, compute the time intervals
-        for i in range(1, len(position_path)): # Start at the second waypoint because robot is already at first waypoint
-            q = position_path[i]
-            dur = []
-            for j in range(len(self._joint_names)):
-                dur.append(max(abs(q[self._joint_names[j]] - self._joint_angle[self._joint_names[j]]) / self._joint_limits.velocity[j], min_traj_dur))
-            interval = max(dur)/self._speed_ratio
-            interval_lengths.append(interval)
-
-            time_so_far += interval
-            total_times.append(time_so_far)
-
-        #TODO check that velocities obey velocity limits
-        #TODO redo below such that dt/interval_lengths are computed from velocities (to populate total_times)
-
-        # Loop through position path 
         for i in range(1, len(position_path)):
             q_t = position_path[i]
             positions = [q_t[n] for n in self._joint_names]
+            velocities = velocities_sequence[i]
 
             if i < len(position_path)-1:
                 q_tm1 = position_path[i-1]
                 q_tp1 = position_path[i+1]
-                dt = interval_lengths[i] + interval_lengths[i+1]
-                velocities = [(q_tp1[n]-q_tm1[n])/dt for n in self._joint_names]
-                print(i, velocities)
+                velocities_dict = self.convertToDict(velocities)
+                elapsed_time = max([(q_tp1[n]-q_tm1[n])/velocities_dict[n] for n in self._joint_names])
             else:
-                velocities = [0.005 for n in self._joint_names]
-                print(i, velocities)
+                # For the last waypoint
+                q_tm1 = position_path[i-1]
+                q_tp1 = position_path[i]
+                velocities_dict = self.convertToDict(velocities)
+                elapsed_time = max([(q_tp1[n]-q_tm1[n])/velocities_dict[n] for n in self._joint_names])
+
+            time_so_far += elapsed_time
+            print(i, velocities, elapsed_time)
             traj_client.add_point(positions=positions,
-                                  time=total_times[i],
+                                  time=time_so_far,
                                   velocities=velocities)
 
         # Generate structures needed for franka_dataflow termination check
