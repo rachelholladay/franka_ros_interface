@@ -608,7 +608,7 @@ class ArmInterface(object):
 
     def move_to_neutral(self, timeout=15.0, speed=0.15):
         """
-        Command the Limb joints to a predefined set of "neutral" joint angles.
+        Command arm to a predefined set of "neutral" joint angles using position control.
         From rosparam /franka_control/neutral_pose.
 
         :type timeout: float
@@ -628,7 +628,7 @@ class ArmInterface(object):
     def move_to_joint_positions(self, positions, timeout=2.0,
                                 threshold=0.00085, test=None):
         """
-        (Blocking) Commands the limb to the provided positions.
+        (Blocking) Commands arm to the provided joint angle positions, using position control.
         Waits until the reported joint state matches that specified.
 
         This function uses a low-pass filter using JointTrajectoryService
@@ -652,11 +652,18 @@ class ArmInterface(object):
     def execute_position_path(self, position_path, timeout=5.0,
                                 threshold=0.00085, test=None):
         """
-        (Blocking) Commands the limb to the provided positions.
-        Waits until the reported joint state matches that specified.
-        This function uses a low-pass filter to smooth the movement.
+        (Blocking) Commands arm to execute a sequence of joint angle positions, 
+        using position control. Waits until the reported joint state matches that 
+        specified. This function uses a low-pass filter to smooth the movement.
 
-        @type positions: dict({str:float})
+        Note that the trajectory timings are assigned based on the joint velocity limits, 
+        min_traj_dur and self._set_speed_ratio. If you would like the robot to move faster, 
+        it is recommended to decrease the min_traj_dur (which controls the minimum time 
+        between waypoints) or increase the speed ratio by calling self.set_joint_position_speed().
+        To specify the timing information (and hence specify a trajectory), please see 
+        one of the controllers below. 
+
+        @type positions: list of dict({str:float})
         @param positions: joint_name:angle command
         @type timeout: float
         @param timeout: seconds to wait for move to finish [15]
@@ -745,12 +752,17 @@ class ArmInterface(object):
     def execute_position_trajectory(self, position_path, path_timing, timeout=5.0,
                                 threshold=0.00085, test=None):
         """
-        (Blocking) Commands the limb to the provided positions.
-        Waits until the reported joint state matches that specified.
-        This function uses a low-pass filter to smooth the movement.
+        (Blocking) Commands arm to execute a sequence of joint angle positions, 
+        using position control, using the the specified timing for each waypoint.
+        Specifically, we use the specified path timings to compute the desired velocity
+        (while checking that this velocity falls within velocity limits).
+        Waits until the reported joint state matches that 
+        specified. This function uses a low-pass filter to smooth the movement.
 
-        @type position_path: dict({str:float})
+        @type position_path: list of dict({str:float})
         @param position_path: joint_name:angle command
+        @type path_timing list of floats
+        @param path_timing: Execution time for each waypoint
         @type timeout: float
         @param timeout: seconds to wait for move to finish [15]
         @type threshold: float
@@ -827,12 +839,15 @@ class ArmInterface(object):
     def execute_position_velocity_trajectory(self, position_path, velocities_sequence, timeout=5.0,
                                 threshold=0.00085, test=None):
         """
-        (Blocking) Commands the limb to the provided positions.
-        Waits until the reported joint state matches that specified.
-        This function uses a low-pass filter to smooth the movement.
+        (Blocking) Commands arm to execute a sequence of joint angle positions and velocities, 
+        using position control. Velocities are checked to fall within joint limits.
+        Waits until the reported joint state matches that 
+        specified. This function uses a low-pass filter to smooth the movement.
 
-        @type positions: dict({str:float})
-        @param positions: joint_name:angle command
+        @type position_path: list of dict({str:float})
+        @param position_path: joint_name:angle command
+        @type velocity_sequence list of 7D lists
+        @param path_timing: Joint velocity for each waypoint
         @type timeout: float
         @param timeout: seconds to wait for move to finish [15]
         @type threshold: float
@@ -914,11 +929,9 @@ class ArmInterface(object):
 
     def move_to_touch(self, positions, timeout=3.0, threshold=0.00085):
         """
-        (Blocking) Commands the limb to the provided positions.
-
-        Waits until the reported joint state matches that specified.
-
-        This function uses a low-pass filter to smooth the movement.
+        (Blocking) Commands the arm to provided joint angle position, terminating 
+        either when contact is detected or the joint angle is reached. This uses 
+        position control and we default to a slower speed. 
 
         @type positions: dict({str:float})
         @param positions: joint_name:angle command
@@ -927,7 +940,6 @@ class ArmInterface(object):
         @type threshold: float
         @param threshold: position threshold in radians across each joint when
         move is considered successful [0.008726646]
-        @param test: optional function returning True if motion must be aborted
         """
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
             self.switchToController(self._ctrl_manager.joint_trajectory_controller)
@@ -982,11 +994,9 @@ class ArmInterface(object):
 
     def move_from_touch(self, positions, timeout=1.5, threshold=0.00085):
         """
-        (Blocking) Commands the limb to the provided positions.
-
-        Waits until the reported joint state matches that specified.
-
-        This function uses a low-pass filter to smooth the movement.
+        (Blocking) Commands the arm to provided joint angle position, anticipating
+        that there may be contact at the begining. This uses position control and 
+        we default to a slower speed. 
 
         @type positions: dict({str:float})
         @param positions: joint_name:angle command
@@ -995,7 +1005,6 @@ class ArmInterface(object):
         @type threshold: float
         @param threshold: position threshold in radians across each joint when
         move is considered successful [0.008726646]
-        @param test: optional function returning True if motion must be aborted
         """
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_trajectory_controller:
             self.switchToController(self._ctrl_manager.joint_trajectory_controller)
