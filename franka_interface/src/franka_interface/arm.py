@@ -1055,7 +1055,20 @@ class ArmInterface(object):
         return NotImplementedError("[SetJointVelocity] Controller not Implemented")
 
     def set_joint_impedance_config(self, q, stiffness=None, vel=0.005):
-        #Need q converted to list
+        """
+        (Blocking) Commands the arm to provided joint angle position, using
+        joint impedance control. The stiffnesses are the diagonal of the stiffness
+        matrix and the dampening matrix is set as a function of the stiffness. 
+        We also run the controller until the robot has sufficiently stopped moving
+
+        @type q: list
+        @param q: joint angles
+        @type stiffness: list
+        @param stiffness: Diagonal of joint stiffness matrix (Parameter of None 
+                          uses the default stiffnesses)
+        @type vel: float
+        @param vel: joint velocities
+        """
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_impedance_controller: 
             self.switchToController(self._ctrl_manager.joint_impedance_controller)
 
@@ -1075,6 +1088,19 @@ class ArmInterface(object):
             rospy.sleep(0.1)
 
     def execute_joint_impedance_path(self, qs, stiffness=None):
+        """
+        Commands the arm to move to a sequence of joint angles, using
+        joint impedance control. The stiffnesses are the diagonal of the stiffness
+        matrix and the dampening matrix is set as a function of the stiffness. 
+        Since the current implementation is rather dumb (we repeatedly call
+        self.set_joint_impedance_config()) the path execution is not smooth.
+
+        @type qs: list of lists
+        @param qs: List of joint angles
+        @type stiffness: list
+        @param stiffness: Diagonal of joint stiffness matrix (Parameter of None 
+                          uses the default stiffnesses)
+        """
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_impedance_controller:
             self.switchToController(self._ctrl_manager.joint_impedance_controller)
 
@@ -1147,6 +1173,18 @@ class ArmInterface(object):
         return NotImplementedError("[SetCartesianVelocity] Controller not Implemented")
 
     def set_cartesian_impedance_pose(self, pose, stiffness=None):
+         """
+        (Blocking) Commands the arm to provided end effector pose, using
+        cartesian impedance control. The stiffnesses are the diagonal of the stiffness
+        matrix and the dampening matrix is set as a function of the stiffness. 
+        We also run the controller until the robot has sufficiently stopped moving
+
+        @type pose: dict({str:np.ndarray (shape:(3,)), str:quaternion.quaternion})
+        @param pose: joint end effector pose
+        @type stiffness: list
+        @param stiffness: Diagonal of cartesian stiffness matrix (Parameter of None 
+                          uses the default stiffnesses)
+        """
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_impedance_controller: 
             self.switchToController(self._ctrl_manager.cartesian_impedance_controller)
 
@@ -1176,6 +1214,19 @@ class ArmInterface(object):
             rospy.sleep(0.1)
 
     def execute_cartesian_impedance_path(self, poses, stiffness=None):
+        """
+        Commands the arm to move to a sequence of end effector poses, using
+        cartesian impedance control. The stiffnesses are the diagonal of the stiffness
+        matrix and the dampening matrix is set as a function of the stiffness. 
+        Since the current implementation is rather dumb (we repeatedly call
+        self.set_cartesian_impedance_pose()) the path execution is not smooth.
+
+        @type poses: List of dict({str:np.ndarray (shape:(3,)), str:quaternion.quaternion})
+        @param poses: List of end effector poses
+        @type stiffness: list
+        @param stiffness: Diagonal of cartesian stiffness matrix (Parameter of None 
+                          uses the default stiffnesses)
+        """
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_impedance_controller: 
             self.switchToController(self._ctrl_manager.cartesian_impedance_controller)
 
@@ -1184,9 +1235,9 @@ class ArmInterface(object):
             if i == 0: self.resetErrors()
 
     def set_cartesian_force(self, target_wrench):
-         def set_cartesian_velocity(self, w, timeout):
         """
-        Command a desired 6D wrench
+        Command a desired 6D wrench (force-torque), where the wrench is in world frame
+        with z pointing up
 
         @type target_wrench: list
         @param target_wrench: Desired force-torque to be exerted
