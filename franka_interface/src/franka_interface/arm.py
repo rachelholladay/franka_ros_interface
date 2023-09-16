@@ -1039,12 +1039,19 @@ class ArmInterface(object):
         rospy.sleep(0.5)
         rospy.loginfo("ArmInterface: Trajectory controlling complete")
 
-    def set_joint_velocity(self, velocity, timeout):
+    def set_joint_velocity(self, velocities, timeout):
+        """
+        Not Implemented! Intended as a basic joint-velocity controller. One idea for the 
+        interface would be to take as input a 7D velocity vector and a timeout. 
+        Hence the controller would command that velocity vector for the specified time
+
+        @type velocities: dict({str:float})
+        @param velocities: joint_name:velocity command
+        @type timeout: float
+        @param timeout: seconds to execute the controller
+        """
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_velocity_controller: 
             self.switchToController(self._ctrl_manager.joint_velocity_controller)
-
-        #TODO One interface idea is to take a velocity and a timeout and to set that velocity until the timeout 
-        # (where we then command zero velocity to stop the motion)
         return NotImplementedError("[SetJointVelocity] Controller not Implemented")
 
     def set_joint_impedance_config(self, q, stiffness=None, vel=0.005):
@@ -1076,6 +1083,14 @@ class ArmInterface(object):
             if i == 0: self.resetErrors()
 
     def set_joint_torques(self, tau):
+        """
+        Not fully Tested! Intended as a basic joint-torque controller, where the only input 
+        is the desired torques. While seemingly full implemented, I'm not confident it works
+        (and would heavily discourage direct torque control anyway). 
+
+        @type tau: list
+        @param tau: joint torques
+        """
         raise NotImplementedError("[SetJointTorques] Controller seems to still be buggy.")
 
         switch_ctrl = True if self._ctrl_manager.current_controller != self._ctrl_manager.joint_torque_controller else False
@@ -1087,6 +1102,14 @@ class ArmInterface(object):
         self._joint_torque_controller_publisher.publish(torque)
 
     def set_cartesian_pose(self, pose):
+        """
+        Not Full Operational! Intended as a basic cartesian position controller, where
+        you specify a desired cartesian pose (as a position and quaternion). However, the 
+        controller continues to throw a weird bug (things arent being referenced properly?
+
+        @type pose: dict({str:np.ndarray (shape:(3,)), str:quaternion.quaternion})
+        @param pose: position (x,y,z) and orientation (quaternion x,y,z,w)
+        """
         raise NotImplementedError("[SetCartesianPose] Controller seems to still be buggy.")
 
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_pose_controller:
@@ -1107,7 +1130,17 @@ class ArmInterface(object):
         while sum(map(abs, self.convertToList(self.joint_velocities()))) > 1e-2:
             rospy.sleep(0.1)
 
-    def set_cartesian_velocity(self, w):
+    def set_cartesian_velocity(self, w, timeout):
+        """
+        Not Implemented! Intended as a basic cartesian-velocity controller. One idea for the 
+        interface would be to take as input a 6D velocity vector and a timeout. 
+        Hence the controller would command that velocity vector for the specified time
+
+        @type w: list
+        @param w: Cartesian velocities
+        @type timeout: float
+        @param timeout: seconds to execute the controller
+        """
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_velocity_controller: 
             self.switchToController(self._ctrl_manager.cartesian_velocity_controller)
 
@@ -1151,6 +1184,13 @@ class ArmInterface(object):
             if i == 0: self.resetErrors()
 
     def set_cartesian_force(self, target_wrench):
+         def set_cartesian_velocity(self, w, timeout):
+        """
+        Command a desired 6D wrench
+
+        @type target_wrench: list
+        @param target_wrench: Desired force-torque to be exerted
+        """
         if self._ctrl_manager.current_controller != self._ctrl_manager.cartesian_force_controller: 
             self.switchToController(self._ctrl_manager.cartesian_force_controller)
 
