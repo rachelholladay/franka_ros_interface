@@ -644,7 +644,6 @@ class ArmInterface(object):
          move is considered successful [0.00085]
         :param test: optional function returning True if motion must be aborted
         """
-
         q_current = self.joint_angles()
         position_path = [q_current, positions]
         self.execute_position_path(position_path, timeout=timeout, threshold=threshold, test=test)
@@ -833,11 +832,12 @@ class ArmInterface(object):
             rate=100,
             raise_on_error=False
             )
+
         rospy.sleep(0.1)
         rospy.loginfo("ArmInterface: Trajectory controlling complete")
 
     def execute_position_velocity_trajectory(self, position_path, velocities_sequence, timeout=5.0,
-                                threshold=0.00085, test=None):
+                                             threshold=0.00085, test=None):
         """
         (Blocking) Commands arm to execute a sequence of joint angle positions and velocities, 
         using position control. Velocities are checked to fall within joint limits.
@@ -867,6 +867,9 @@ class ArmInterface(object):
         # Verify that we are at the start of the trajectory
         current_q = self.joint_angles()
         diff_from_start = sum([abs(a-current_q[j]) for j, a in position_path[0].items()])
+        print('[ExecutePositionPath] Diff:', diff_from_start)
+        #print('[ExecutePositionPath] Current:', current_q)
+        #print('[ExecutePositionPath] Start:', position_path[0])
         if diff_from_start > 0.1:
             raise IOError("[ExecutePositionPath] Robot not at start of trajectory")
 
@@ -906,6 +909,7 @@ class ArmInterface(object):
         # Generate structures needed for franka_dataflow termination check
         diffs = [self.genf(j, a) for j, a in (position_path[-1]).items() if j in self._joint_angle] 
         fail_msg = "ArmInterface: {0} limb failed to reach commanded joint positions.".format(self.name.capitalize())
+        
         def test_collision():
             if self.has_collided():
                 rospy.logerr(' '.join(["Collision detected.", fail_msg]))
@@ -924,6 +928,7 @@ class ArmInterface(object):
             rate=100,
             raise_on_error=False
             )
+
         rospy.sleep(0.1)
         rospy.loginfo("ArmInterface: Trajectory controlling complete")
 
@@ -1220,7 +1225,6 @@ class ArmInterface(object):
         matrix and the dampening matrix is set as a function of the stiffness. 
         Since the current implementation is rather dumb (we repeatedly call
         self.set_cartesian_impedance_pose()) the path execution is not smooth.
-
         @type poses: List of dict({str:np.ndarray (shape:(3,)), str:quaternion.quaternion})
         @param poses: List of end effector poses
         @type stiffness: list
@@ -1250,7 +1254,7 @@ class ArmInterface(object):
         wrench.force.y = target_wrench[1]
         wrench.force.z = target_wrench[2]
         wrench.torque.x = target_wrench[3]
-        wrench.torque.y = target_wrench[4] 
+        wrench.torque.y = target_wrench[4]
         wrench.torque.z = target_wrench[5]
         self._cartesian_force_controller_publisher.publish(wrench)
 
