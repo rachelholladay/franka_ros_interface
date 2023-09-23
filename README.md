@@ -2,6 +2,12 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/ec16a09639d341358b73cb8cdaa57d2e)](https://www.codacy.com/manual/justagist/franka_ros_interface?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=justagist/franka_ros_interface&amp;utm_campaign=Badge_Grade) [![Build Status](https://travis-ci.org/justagist/franka_ros_interface.svg?branch=v0.7.1)](https://travis-ci.org/justagist/franka_ros_interface)
 
+---------------
+
+**Forward**: *This is a fork of [Saif Sidhik](https://github.com/justagist) original library, where the primary modifications are added controllers and dettachment from the simulation interface. I have kept the original README.md, given below. For documentation focused on the setup of the panda within my labs, as well as usage documentation, please see this repo's [wiki](https://github.com/rachelholladay/franka_ros_interface/wiki).*
+
+---------------
+
 A ROS interface library for the Franka Emika Panda robot, extending the [franka-ros][franka-ros] to expose more information about the robot, and
 providing low-level control of the robot using ROS and [Python API][fri-doc].
 
