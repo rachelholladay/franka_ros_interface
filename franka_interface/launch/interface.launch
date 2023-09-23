@@ -15,7 +15,9 @@
 
   <!-- Start the custom_franka_control_node for advertising controller services and starting custom controller manager-->
   <rosparam command="load" file="$(find franka_interface)/config/robot_config.yaml"/>
-  <param name="/robot_config/robot_ip" type="str" value="$(env FRANKA_ROBOT_IP)" />
+  <param name="/robot_config/robot_ip" type="str" value="172.16.0.2" />
+  <!--<param name="/robot_config/robot_ip" type="str" value="$(env FRANKA_ROBOT_IP)" />-->
+
   <node name="franka_control" pkg="franka_interface" type="custom_franka_control_node" output="screen" required="true" >
     <!-- <rosparam command="load" file="$(find franka_control)/config/custom_franka_control_node.yaml" /> -->
     <param name="robot_ip" value="172.16.0.2" />
@@ -47,16 +49,15 @@
   <!-- Load the custom controllers -->
   <group if="$(eval arg('start_controllers') == true)">
     <node name="load_controllers" pkg="controller_manager" type="controller_manager" respawn="false"
-                      output="screen" args="load
-                                           franka_ros_interface/effort_joint_impedance_controller
+	             output="screen" args="load
+	                                   franka_ros_interface/joint_position_controller
                                            franka_ros_interface/effort_joint_position_controller
-                                           franka_ros_interface/effort_joint_torque_controller
-                                           franka_ros_interface/force_controller
-                                           franka_ros_interface/ntorque_controller
-                                           franka_ros_interface/joint_impedance_controller 
-                                           franka_ros_interface/cartesian_impedance_controller
-                                           franka_ros_interface/velocity_joint_velocity_controller
-                                           franka_ros_interface/position_joint_position_controller"/>
+                                           franka_ros_interface/joint_velocity_controller
+                                           franka_ros_interface/joint_torque_controller
+					   franka_ros_interface/joint_impedance_controller
+					   franka_ros_interface/cartesian_pose_controller
+                                           franka_ros_interface/cartesian_force_controller
+					   franka_ros_interface/cartesian_impedance_controller"/>
   </group>    
 
   <!-- Start rViz -->

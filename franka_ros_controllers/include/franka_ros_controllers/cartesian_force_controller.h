@@ -21,7 +21,7 @@
 
 namespace franka_ros_controllers {
 
-class ForceController : public controller_interface::MultiInterfaceController<
+class CartesianForceController : public controller_interface::MultiInterfaceController<
                                    franka_hw::FrankaModelInterface,
                                    hardware_interface::EffortJointInterface,
                                    franka_hw::FrankaStateInterface> {

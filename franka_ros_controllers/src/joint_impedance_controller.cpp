@@ -183,22 +183,8 @@ void JointImpedanceController::starting(const ros::Time& /*time*/) {
 
 void JointImpedanceController::update(const ros::Time& /*time*/,
                                              const ros::Duration& period) {
-  /*if (vel_current_ < vel_max_) {
-    vel_current_ += period.toSec() * std::fabs(vel_max_ / acceleration_time_);
-  }
-  vel_current_ = std::fmin(vel_current_, vel_max_);
-
-  angle_ += period.toSec() * vel_current_ / std::fabs(radius_);
-  if (angle_ > 2 * M_PI) {
-    angle_ -= 2 * M_PI;
-  }
-
-  double delta_y = radius_ * (1 - std::cos(angle_));
-  double delta_z = radius_ * std::sin(angle_);*/
 
   std::array<double, 16> pose_desired = initial_pose_;
-  //pose_desired[13] += 0;
-  //pose_desired[14] += 0;
   cartesian_pose_handle_->setCommand(pose_desired);
 
   franka::RobotState robot_state = cartesian_pose_handle_->getRobotState();
@@ -217,8 +203,7 @@ void JointImpedanceController::update(const ros::Time& /*time*/,
     //                      d_gains_[i] * (robot_state.dq_d[i] - dq_filtered_[i]);
     tau_d_calculated[i] = coriolis_factor_ * coriolis[i] +
                           k_gains_[i] * (pos_d_target_[i] - robot_state.q[i]) +
-                          d_gains_[i] * (dq_d_[i] - dq_filtered_[i]);
-    
+                          d_gains_[i] * (dq_d_[i] - dq_filtered_[i]);    
   }
 
   // Maximum torque difference with a sampling rate of 1 kHz. The maximum torque rate is
@@ -313,7 +298,7 @@ void JointImpedanceController::stiffnessParamCallback(
 
   for (size_t i = 0;  i < 7; ++i){
       k_gains_[i] = msg.stiffness[i];
-      d_gains_[i] = 2.0 * sqrt(msg.stiffness[i]);
+      d_gains_[i] = 2.0 * sqrt(msg.stiffness[i]); 
   }  
 
 }

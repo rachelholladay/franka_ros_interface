@@ -23,7 +23,7 @@
 
 namespace franka_ros_controllers {
 
-class NTorqueController : public controller_interface::MultiInterfaceController<
+class JointTorqueController : public controller_interface::MultiInterfaceController<
                                    franka_hw::FrankaModelInterface,
                                    hardware_interface::EffortJointInterface,
                                    franka_hw::FrankaStateInterface> {

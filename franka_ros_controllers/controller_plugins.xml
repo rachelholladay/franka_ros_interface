@@ -1,13 +1,6 @@
 <library path="lib/libfranka_ros_controllers">
-  <class name="franka_ros_controllers/EffortJointImpedanceController"
-         type="franka_ros_controllers::EffortJointImpedanceController"
-         base_class_type="controller_interface::ControllerBase">
-    <description>
-      Controller for commanding joint position and velocity of the Franka arm using impedance control (torque)
-    </description>
-  </class>
-  <class name="franka_ros_controllers/PositionJointPositionController"
-         type="franka_ros_controllers::PositionJointPositionController"
+  <class name="franka_ros_controllers/JointPositionController"
+         type="franka_ros_controllers::JointPositionController"
          base_class_type="controller_interface::ControllerBase">
     <description>
       Controller for commanding absolute joint positions of the Franka arm
@@ -20,46 +13,53 @@
       Controller for commanding joint position of the Franka arm using effort control (torque)
     </description>
   </class>  
-  <class name="franka_ros_controllers/EffortJointTorqueController"
-         type="franka_ros_controllers::EffortJointTorqueController"
+  <class name="franka_ros_controllers/JointTorqueController"
+         type="franka_ros_controllers::JointTorqueController"
          base_class_type="controller_interface::ControllerBase">
     <description>
       Controller for commanding joint torques of the Franka arm directly
     </description>
   </class>  
-  <class name="franka_ros_controllers/VelocityJointVelocityController"
-         type="franka_ros_controllers::VelocityJointVelocityController"
+  <class name="franka_ros_controllers/JointVelocityController"
+         type="franka_ros_controllers::JointVelocityController"
          base_class_type="controller_interface::ControllerBase">
     <description>
       Controller for commanding joint velocity of the Franka arm using internal joint velocity controller
-    </description>
-  </class>
-  <class name="franka_ros_controllers/ForceController"
-         type="franka_ros_controllers::ForceController"
-         base_class_type="controller_interface::ControllerBase">
-    <description>
-      Controller for commanding forces to be exerted by the Franka Arm
-    </description>
-  </class> 
-  <class name="franka_ros_controllers/CartesianImpedanceController"
-         type="franka_ros_controllers::CartesianImpedanceController"
-         base_class_type="controller_interface::ControllerBase">
-    <description>
-      REWRITE - Controller for commanding forces to be exerted by the Franka Arm
     </description>
   </class>
   <class name="franka_ros_controllers/JointImpedanceController"
          type="franka_ros_controllers::JointImpedanceController"
          base_class_type="controller_interface::ControllerBase">
     <description>
-      REWRITE - Controller for commanding forces to be exerted by the Franka Arm
+      Controller for commanding joint impedances to be exerted by the Franka Arm
     </description>
   </class>
-  <class name="franka_ros_controllers/NTorqueController"
-         type="franka_ros_controllers::NTorqueController"
+  <class name="franka_ros_controllers/CartesianPoseController"
+         type="franka_ros_controllers::CartesianPoseController"
          base_class_type="controller_interface::ControllerBase">
     <description>
-      REWRITE - Controller for commanding forces to be exerted by the Franka Arm
+      Controller for commanding cartesian poses to be exerted by the Franka Arm
+    </description>
+  </class>
+  <class name="franka_ros_controllers/CartesianVelocitiesController"
+         type="franka_ros_controllers::CartesianVelocitiesController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      Controller for commanding cartesian velocities to be exerted by the Franka Arm
+    </description>
+  </class>
+  <class name="franka_ros_controllers/CartesianForceController"
+         type="franka_ros_controllers::CartesianForceController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      Controller for commanding cartesian forces to be exerted by the Franka Arm
+    </description>
+  </class>
+  <class name="franka_ros_controllers/CartesianImpedanceController"
+         type="franka_ros_controllers::CartesianImpedanceController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      Controller for commanding cartesian impedances to be exerted by the Franka Arm
     </description>
   </class>
 </library>

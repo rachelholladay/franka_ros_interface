@@ -65,14 +65,13 @@ namespace franka_interface {
     ros::Subscriber joint_command_sub_;
     boost::shared_ptr<controller_manager::ControllerManager> controller_manager_;
 
-    std::string position_controller_name_;
-    std::string velocity_controller_name_;
-    std::string impedance_controller_name_;
-    std::string torque_controller_name_;
-    std::string force_controller_name_;
-    std::string ntorque_controller_name_;
-    std::string cartesian_impedance_controller_name_;
+    std::string joint_position_controller_name_;
+    std::string joint_velocity_controller_name_;
     std::string joint_impedance_controller_name_;
+    std::string joint_torque_controller_name_;
+    std::string cartesian_pose_controller_name_;
+    std::string cartesian_impedance_controller_name_;
+    std::string cartesian_force_controller_name_;
     std::string trajectory_controller_name_;
 
     std::string default_controller_name_;

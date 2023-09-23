@@ -187,11 +187,15 @@ class FrankaControllerManagerInterface(object):
         self._controller_lister = ControllerLister(self._cm_ns)
 
         self._controller_names_from_rosparam = {
-            'joint_position_controller': _get_controller_name_from_rosparam_server('/controllers_config/position_controller'),
-            'joint_velocity_controller': _get_controller_name_from_rosparam_server('/controllers_config/velocity_controller'),
-            'joint_torque_controller': _get_controller_name_from_rosparam_server('/controllers_config/torque_controller'),
+            'joint_position_controller': _get_controller_name_from_rosparam_server('/controllers_config/joint_position_controller'),
+            'joint_velocity_controller': _get_controller_name_from_rosparam_server('/controllers_config/joint_velocity_controller'),
+            'joint_torque_controller': _get_controller_name_from_rosparam_server('/controllers_config/joint_torque_controller'),
+            'joint_impedance_controller': _get_controller_name_from_rosparam_server('/controllers_config/joint_impedance_controller'),
             'joint_trajectory_controller': _get_controller_name_from_rosparam_server('/controllers_config/trajectory_controller'),
-            'effort_joint_position_controller': _get_controller_name_from_rosparam_server('/controllers_config/impedance_controller'),
+            'effort_joint_position_controller': _get_controller_name_from_rosparam_server('/controllers_config/effort_joint_position_controller'),
+            'cartesian_pose_controller': _get_controller_name_from_rosparam_server('/controllers_config/cartesian_pose_controller'),
+            'cartesian_force_controller': _get_controller_name_from_rosparam_server('/controllers_config/cartesian_force_controller'),
+            'cartesian_impedance_controller': _get_controller_name_from_rosparam_server('/controllers_config/cartesian_impedance_controller'),
             'default_controller': _get_controller_name_from_rosparam_server('/controllers_config/default_controller'),
         }
 
@@ -553,30 +557,7 @@ class FrankaControllerManagerInterface(object):
         :type: str
         """
         return self._controller_names_from_rosparam['joint_position_controller'] 
-    @property
-    def effort_joint_torque_controller(self):
-        return self._ns[1:] + "/effort_joint_torque_controller"    
-    @property
-    def effort_joint_impedance_controller(self):
-        return self._ns[1:] + "/effort_joint_impedance_controller"   
-    @property
-    def effort_joint_position_controller(self):
-        return self._ns[1:] + "/effort_joint_position_controller"
 
-    @property
-    def force_controller(self):
-        return self._ns[1:] + "/force_controller"
-    @property
-    def ntorque_controller(self):
-        return self._ns[1:] + "/ntorque_controller"
-    @property
-    def joint_impedance_controller(self):
-        return self._ns[1:] + "/joint_impedance_controller"
-    @property
-    def cartesian_impedance_controller(self):
-        return self._ns[1:] + "/cartesian_impedance_controller"
-
-    '''
     @property
     def joint_torque_controller(self):
         """
@@ -587,7 +568,9 @@ class FrankaControllerManagerInterface(object):
             :py:meth:`FrankaControllerManagerInterface.set_motion_controller`.
         :type: str
         """
-        return self._controller_names_from_rosparam['joint_torque_controller']     
+        return self._controller_names_from_rosparam['joint_torque_controller']
+        #return self._ns[1:] + "/effort_joint_torque_controller"    
+
     @property
     def joint_impedance_controller(self):
         """
@@ -598,7 +581,9 @@ class FrankaControllerManagerInterface(object):
             :py:meth:`FrankaControllerManagerInterface.set_motion_controller`.
         :type: str
         """
-        return self._controller_names_from_rosparam['joint_impedance_controller']  
+        return self._controller_names_from_rosparam['joint_impedance_controller']
+        #return self._ns[1:] + "/effort_joint_impedance_controller"   
+
     @property
     def effort_joint_position_controller(self):
         """
@@ -610,7 +595,23 @@ class FrankaControllerManagerInterface(object):
         :type: str
         """
         return self._controller_names_from_rosparam['effort_joint_position_controller']
-    '''
+        #return self._ns[1:] + "/effort_joint_position_controller"
+
+    @property
+    def cartesian_force_controller(self):
+        return self._controller_names_from_rosparam['cartesian_force_controller']
+        #return self._ns[1:] + "/force_controller"
+
+    @property
+    def cartesian_impedance_controller(self):
+        return self._controller_names_from_rosparam['cartesian_impedance_controller']
+        #return self._ns[1:] + "/cartesian_impedance_controller"
+
+    @property
+    def cartesian_pose_controller(self):
+        return self._controller_names_from_rosparam['cartesian_pose_controller']
+        #return self._ns[1:] + "/cartesian_pose_controller"
+
     @property
     def joint_trajectory_controller(self):
         """

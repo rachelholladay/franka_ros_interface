@@ -1,6 +1,6 @@
 // Copyright (c) 2017 Franka Emika GmbH
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
-#include <franka_ros_controllers/ntorque_controller.h>
+#include <franka_ros_controllers/joint_torque_controller.h>
 
 #include <cmath>
 #include <memory>
@@ -13,20 +13,20 @@
 
 namespace franka_ros_controllers {
 
-bool NTorqueController::init(hardware_interface::RobotHW* robot_hw,
+bool JointTorqueController::init(hardware_interface::RobotHW* robot_hw,
                                   ros::NodeHandle& node_handle) {
   std::vector<std::string> joint_names;
   std::string arm_id;
 
   torque_params_ = node_handle.subscribe(
-    "/torque_target", 20, &NTorqueController::torqueParamCallback, this,
+    "/torque_target", 20, &JointTorqueController::torqueParamCallback, this,
     ros::TransportHints().reliable().tcpNoDelay());
 
   ROS_WARN(
-      "TorqueController: Make sure your robot's endeffector is in contact "
+      "JointTorqueController: Make sure your robot's endeffector is in contact "
       "with a horizontal surface before starting the controller!");
   if (!node_handle.getParam("arm_id", arm_id)) {
-    ROS_ERROR("TorqueController: Could not read parameter arm_id");
+    ROS_ERROR("JointTorqueController: Could not read parameter arm_id");
     return false;
   }
   /*if (!node_handle.getParam("joint_names", joint_names) || joint_names.size() != 7) {
@@ -40,7 +40,7 @@ bool NTorqueController::init(hardware_interface::RobotHW* robot_hw,
 
   if (!node_handle.getParam("/robot_config/joint_names", joint_limits_.joint_names) || joint_limits_.joint_names.size() != 7) {
     ROS_ERROR(
-        "TorqueController: Invalid or no joint_names parameters provided, aborting "
+        "JointTorqueController: Invalid or no joint_names parameters provided, aborting "
         "controller init!");
     return false;
   }
@@ -49,7 +49,7 @@ bool NTorqueController::init(hardware_interface::RobotHW* robot_hw,
   std::map<std::string, double> torque_limit_map;
   if (!node_handle.getParam("/robot_config/joint_config/joint_effort_limit", torque_limit_map))
   {
-    ROS_ERROR("TorqueController: Failed to find joint effort limits on the param server. Aborting controller init");
+    ROS_ERROR("JointTorqueController: Failed to find joint effort limits on the param server. Aborting controller init");
     return false;
   }
 
@@ -58,14 +58,14 @@ bool NTorqueController::init(hardware_interface::RobotHW* robot_hw,
     if (torque_limit_map.find(joint_limits_.joint_names[i]) != torque_limit_map.end()) {
         joint_limits_.effort.push_back(torque_limit_map[joint_limits_.joint_names[i]]);
     } else {
-        ROS_ERROR("TorqueController: Unable to find torque limit values for joint %s...",
+        ROS_ERROR("JointTorqueController: Unable to find torque limit values for joint %s...",
                        joint_limits_.joint_names[i].c_str());
       }
   }
 
   auto* model_interface = robot_hw->get<franka_hw::FrankaModelInterface>();
   if (model_interface == nullptr) {
-    ROS_ERROR_STREAM("TorqueController: Error getting model interface from hardware");
+    ROS_ERROR_STREAM("JointTorqueController: Error getting model interface from hardware");
     return false;
   }
   try {
@@ -73,13 +73,13 @@ bool NTorqueController::init(hardware_interface::RobotHW* robot_hw,
         model_interface->getHandle(arm_id + "_model"));
   } catch (hardware_interface::HardwareInterfaceException& ex) {
     ROS_ERROR_STREAM(
-        "TorqueController: Exception getting model handle from interface: " << ex.what());
+        "JointTorqueController: Exception getting model handle from interface: " << ex.what());
     return false;
   }
 
   auto* state_interface = robot_hw->get<franka_hw::FrankaStateInterface>();
   if (state_interface == nullptr) {
-    ROS_ERROR_STREAM("TorqueController: Error getting state interface from hardware");
+    ROS_ERROR_STREAM("JointTorqueController: Error getting state interface from hardware");
     return false;
   }
   try {
@@ -87,13 +87,13 @@ bool NTorqueController::init(hardware_interface::RobotHW* robot_hw,
         state_interface->getHandle(arm_id + "_robot"));
   } catch (hardware_interface::HardwareInterfaceException& ex) {
     ROS_ERROR_STREAM(
-        "TorqueController: Exception getting state handle from interface: " << ex.what());
+        "JointTorqueController: Exception getting state handle from interface: " << ex.what());
     return false;
   }
 
   auto* effort_joint_interface = robot_hw->get<hardware_interface::EffortJointInterface>();
   if (effort_joint_interface == nullptr) {
-    ROS_ERROR_STREAM("TorqueController: Error getting effort joint interface from hardware");
+    ROS_ERROR_STREAM("JointTorqueController: Error getting effort joint interface from hardware");
     return false;
   }
 
@@ -113,7 +113,7 @@ bool NTorqueController::init(hardware_interface::RobotHW* robot_hw,
   return true;
 }
 
-void NTorqueController::starting(const ros::Time& /*time*/) {
+void JointTorqueController::starting(const ros::Time& /*time*/) {
   franka::RobotState robot_state = state_handle_->getRobotState();
   std::array<double, 7> gravity_array = model_handle_->getGravity();
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_measured(robot_state.tau_J.data());
@@ -123,7 +123,7 @@ void NTorqueController::starting(const ros::Time& /*time*/) {
   tau_error_.setZero();
 }
 
-void NTorqueController::update(const ros::Time& /*time*/, const ros::Duration& period) {
+void JointTorqueController::update(const ros::Time& /*time*/, const ros::Duration& period) {
   franka::RobotState robot_state = state_handle_->getRobotState();
   std::array<double, 42> jacobian_array =
       model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
@@ -146,14 +146,14 @@ void NTorqueController::update(const ros::Time& /*time*/, const ros::Duration& p
   desired_torque_ = filter_gain_ * target_torque_ + (1 - filter_gain_) * desired_torque_;
 }
 
-void NTorqueController::torqueParamCallback(
+void JointTorqueController::torqueParamCallback(
      const franka_core_msgs::TorqueCmdConstPtr& msg) {
 
   if (msg->torque.size() != 7) {
-      ROS_ERROR_STREAM("TorqueController: Published Commands are not of size 7");
+      ROS_ERROR_STREAM("JointTorqueController: Published Commands are not of size 7");
   }
   else if (checkTorqueLimits(msg->torque)) {
-      ROS_ERROR_STREAM("TorqueController: Commanded positions or velicities are beyond allowed position limits.");
+      ROS_ERROR_STREAM("JointTorqueController: Commanded positions or velicities are beyond allowed position limits.");
   }
   else {
       for (size_t i = 0; i < 7; ++i) {
@@ -164,7 +164,7 @@ void NTorqueController::torqueParamCallback(
   }
 }
 
-bool NTorqueController::checkTorqueLimits(std::vector<double> torques)
+bool JointTorqueController::checkTorqueLimits(std::vector<double> torques)
 {
   for (size_t i = 0;  i < 7; ++i){
     if (!(abs(torques[i]) < joint_limits_.effort[i])){
@@ -175,7 +175,7 @@ bool NTorqueController::checkTorqueLimits(std::vector<double> torques)
   return false;
 }
 
-Eigen::Matrix<double, 7, 1> NTorqueController::saturateTorqueRate(
+Eigen::Matrix<double, 7, 1> JointTorqueController::saturateTorqueRate(
     const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {  // NOLINT (readability-identifier-naming)
   Eigen::Matrix<double, 7, 1> tau_d_saturated{};
@@ -188,5 +188,5 @@ Eigen::Matrix<double, 7, 1> NTorqueController::saturateTorqueRate(
 
 }  // namespace franka_ros_controllers
 
-PLUGINLIB_EXPORT_CLASS(franka_ros_controllers::NTorqueController,
+PLUGINLIB_EXPORT_CLASS(franka_ros_controllers::JointTorqueController,
                        controller_interface::ControllerBase)

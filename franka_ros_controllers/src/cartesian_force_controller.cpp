@@ -1,6 +1,6 @@
 // Copyright (c) 2017 Franka Emika GmbH
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
-#include <franka_ros_controllers/force_controller.h>
+#include <franka_ros_controllers/cartesian_force_controller.h>
 
 #include <cmath>
 #include <memory>
@@ -13,32 +13,32 @@
 
 namespace franka_ros_controllers {
 
-bool ForceController::init(hardware_interface::RobotHW* robot_hw,
+bool CartesianForceController::init(hardware_interface::RobotHW* robot_hw,
                                   ros::NodeHandle& node_handle) {
   std::vector<std::string> joint_names;
   std::string arm_id;
 
   force_params_ = node_handle.subscribe(
-    "/wrench_target", 20, &ForceController::forceParamCallback, this,
+    "/wrench_target", 20, &CartesianForceController::forceParamCallback, this,
     ros::TransportHints().reliable().tcpNoDelay());
 
   ROS_WARN(
-      "ForceController: Make sure your robot's endeffector is in contact "
+      "CartesianForceController: Make sure your robot's endeffector is in contact "
       "with a horizontal surface before starting the controller!");
   if (!node_handle.getParam("arm_id", arm_id)) {
-    ROS_ERROR("ForceController: Could not read parameter arm_id");
+    ROS_ERROR("CartesianForceController: Could not read parameter arm_id");
     return false;
   }
   if (!node_handle.getParam("joint_names", joint_names) || joint_names.size() != 7) {
     ROS_ERROR(
-        "ForceController: Invalid or no joint_names parameters provided, aborting "
+        "CartesianForceController: Invalid or no joint_names parameters provided, aborting "
         "controller init!");
     return false;
   }
 
   auto* model_interface = robot_hw->get<franka_hw::FrankaModelInterface>();
   if (model_interface == nullptr) {
-    ROS_ERROR_STREAM("ForceController: Error getting model interface from hardware");
+    ROS_ERROR_STREAM("CartesianForceController: Error getting model interface from hardware");
     return false;
   }
   try {
@@ -46,13 +46,13 @@ bool ForceController::init(hardware_interface::RobotHW* robot_hw,
         model_interface->getHandle(arm_id + "_model"));
   } catch (hardware_interface::HardwareInterfaceException& ex) {
     ROS_ERROR_STREAM(
-        "ForceController: Exception getting model handle from interface: " << ex.what());
+        "CartesianForceController: Exception getting model handle from interface: " << ex.what());
     return false;
   }
 
   auto* state_interface = robot_hw->get<franka_hw::FrankaStateInterface>();
   if (state_interface == nullptr) {
-    ROS_ERROR_STREAM("ForceController: Error getting state interface from hardware");
+    ROS_ERROR_STREAM("CartesianForceController: Error getting state interface from hardware");
     return false;
   }
   try {
@@ -60,20 +60,20 @@ bool ForceController::init(hardware_interface::RobotHW* robot_hw,
         state_interface->getHandle(arm_id + "_robot"));
   } catch (hardware_interface::HardwareInterfaceException& ex) {
     ROS_ERROR_STREAM(
-        "ForceController: Exception getting state handle from interface: " << ex.what());
+        "CartesianForceController: Exception getting state handle from interface: " << ex.what());
     return false;
   }
 
   auto* effort_joint_interface = robot_hw->get<hardware_interface::EffortJointInterface>();
   if (effort_joint_interface == nullptr) {
-    ROS_ERROR_STREAM("ForceController: Error getting effort joint interface from hardware");
+    ROS_ERROR_STREAM("CartesianForceController: Error getting effort joint interface from hardware");
     return false;
   }
   for (size_t i = 0; i < 7; ++i) {
     try {
       joint_handles_.push_back(effort_joint_interface->getHandle(joint_names[i]));
     } catch (const hardware_interface::HardwareInterfaceException& ex) {
-      ROS_ERROR_STREAM("ForceController: Exception getting joint handles: " << ex.what());
+      ROS_ERROR_STREAM("CartesianForceController: Exception getting joint handles: " << ex.what());
       return false;
     }
   }
@@ -85,7 +85,7 @@ bool ForceController::init(hardware_interface::RobotHW* robot_hw,
   return true;
 }
 
-void ForceController::starting(const ros::Time& /*time*/) {
+void CartesianForceController::starting(const ros::Time& /*time*/) {
   franka::RobotState robot_state = state_handle_->getRobotState();
   std::array<double, 7> gravity_array = model_handle_->getGravity();
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_measured(robot_state.tau_J.data());
@@ -95,7 +95,7 @@ void ForceController::starting(const ros::Time& /*time*/) {
   tau_error_.setZero();
 }
 
-void ForceController::update(const ros::Time& /*time*/, const ros::Duration& period) {
+void CartesianForceController::update(const ros::Time& /*time*/, const ros::Duration& period) {
   franka::RobotState robot_state = state_handle_->getRobotState();
   std::array<double, 42> jacobian_array =
       model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
@@ -129,7 +129,7 @@ void ForceController::update(const ros::Time& /*time*/, const ros::Duration& per
   k_i_ = filter_gain_ * target_k_i_ + (1 - filter_gain_) * k_i_;
 }
 
-void ForceController::forceParamCallback(
+void CartesianForceController::forceParamCallback(
      const geometry_msgs::Wrench& msg) {
 
   target_mass_(0) = msg.force.x;
@@ -141,7 +141,7 @@ void ForceController::forceParamCallback(
 }
 
 
-Eigen::Matrix<double, 7, 1> ForceController::saturateTorqueRate(
+Eigen::Matrix<double, 7, 1> CartesianForceController::saturateTorqueRate(
     const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {  // NOLINT (readability-identifier-naming)
   Eigen::Matrix<double, 7, 1> tau_d_saturated{};
@@ -154,5 +154,5 @@ Eigen::Matrix<double, 7, 1> ForceController::saturateTorqueRate(
 
 }  // namespace franka_ros_controllers
 
-PLUGINLIB_EXPORT_CLASS(franka_ros_controllers::ForceController,
+PLUGINLIB_EXPORT_CLASS(franka_ros_controllers::CartesianForceController,
                        controller_interface::ControllerBase)
