@@ -39,7 +39,7 @@ import numpy as np
 from copy import deepcopy
 from rospy_message_converter import message_converter
 
-from franka_core_msgs.msg import JointCommand, RobotState, EndPointState, CartImpedanceStiffness, JointImpedanceStiffness, TorqueCmd, JICmd
+from franka_core_msgs.msg import JointCommand, RobotState, EndPointState, CartImpedanceStiffness, JointImpedanceStiffness, TorqueCmd, JICmd, JointCommand
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
 from geometry_msgs.msg import PoseStamped, Wrench
@@ -219,6 +219,9 @@ class ArmInterface(object):
         self._joint_impedance_publisher = rospy.Publisher("joint_impedance_position_velocity", JICmd, queue_size=20)
         self._joint_stiffness_publisher = rospy.Publisher("joint_impedance_stiffness", JointImpedanceStiffness, queue_size=10)
 
+        # Joint Command Controller Publishers
+        self._joint_command_publisher = rospy.Publisher("joint_command", JointCommand, queue_size=20)
+
         rospy.on_shutdown(self._clean_shutdown)
 
         err_msg = ("%s arm init failed to get current joint_states "
@@ -261,6 +264,7 @@ class ArmInterface(object):
         self._cartesian_stiffness_publisher.unregister()
         self._cartesian_force_controller_publisher.unregister()
         self._joint_torque_controller_publisher.unregister()
+        self._joint_command_controller_publisher.unregister()
         self._joint_impedance_publisher.unregister()
         self._joint_stiffness_publisher.unregister()
 
@@ -800,11 +804,14 @@ class ArmInterface(object):
                 velocities = [(q_tp1[n]-q_tm1[n])/dt for n in self._joint_names]
                 # Check that, using specified timing, the desired velocity is within velocity limits. 
                 if not all(np.less(velocities, self._joint_limits.velocity)):
+                    print(velocities)
+                    print(self._joint_limits.velocity)
                     raise ValueError("Specified timing violated velocity limits")
                 print(i, velocities)
             else:
                 # For the last waypoint, use some default velocity
-                velocities = [0.005 for n in self._joint_names]
+                #velocities = [0.005 for n in self._joint_names]
+                velocities = [0.01 for n in self._joint_names]
                 print(i, velocities)
 
             traj_client.add_point(positions=positions,
@@ -1044,7 +1051,7 @@ class ArmInterface(object):
         rospy.sleep(0.5)
         rospy.loginfo("ArmInterface: Trajectory controlling complete")
 
-    def set_joint_velocity(self, velocities, timeout):
+    def set_joint_velocity(self, velocities, timeout=None):
         """
         Not Implemented! Intended as a basic joint-velocity controller. One idea for the 
         interface would be to take as input a 7D velocity vector and a timeout. 
@@ -1058,6 +1065,23 @@ class ArmInterface(object):
         if self._ctrl_manager.current_controller != self._ctrl_manager.joint_velocity_controller: 
             self.switchToController(self._ctrl_manager.joint_velocity_controller)
         return NotImplementedError("[SetJointVelocity] Controller not Implemented")
+
+        jcommand = JointCommand()
+        jcommand.mode = 2 # Velocity mode
+        jcommand.names = self._joint_names
+        jcommand.velocity = velocities
+
+        self._joint_velocity_controller_publisher.publish(jcommand)
+
+        # If given timeout, then after that, send 0 velocities to stop robot
+        # Will need to test if this is the right thing to do
+        if timeout is not None:
+            rospy.sleep(timeout)
+            stopc = JointCommand()
+            stopc.mode = 2
+            stopc.names = self._joint_names
+            stopc.velocity = [0]*7
+            self._joint_velocity_controller_publisher.publish(stopc)
 
     def set_joint_impedance_config(self, q, stiffness=None, vel=0.005):
         """
@@ -1178,7 +1202,7 @@ class ArmInterface(object):
         return NotImplementedError("[SetCartesianVelocity] Controller not Implemented")
 
     def set_cartesian_impedance_pose(self, pose, stiffness=None):
-         """
+        """
         (Blocking) Commands the arm to provided end effector pose, using
         cartesian impedance control. The stiffnesses are the diagonal of the stiffness
         matrix and the dampening matrix is set as a function of the stiffness. 
